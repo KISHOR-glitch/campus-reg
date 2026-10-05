@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Live College Scoreboard – Build Your First AI Project in 60 Minutes</title>
+  <meta name="description" content="Live leaderboard for the NxtWave free workshop: Build Your First AI Project in 60 Minutes. See which engineering college is leading registrations." />
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            bg:        '#0A0C10',
+            panel:     '#12151C',
+            border:    '#222836',
+            blue:      '#2F7BFF',
+            mint:      '#27E1A0',
+            gold:      '#F5C542',
+            silver:    '#C0C0D0',
+            bronze:    '#CD7F32',
+          },
+          fontFamily: {
+            sora:    ['Sora', 'sans-serif'],
+            manrope: ['Manrope', 'sans-serif'],
+          },
+        },
+      },
+    };
+  </script>
+
+  <style>
+    /* ── Base reset ──────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: #0A0C10;
+      color: #E2E8F0;
+      font-family: 'Manrope', sans-serif;
+      min-height: 100dvh;
+    }
+
+    h1, h2, h3, h4, h5, h6 { font-family: 'Sora', sans-serif; }
+
+    /* ── Focus visible ───────────────────────────────────────────── */
+    :focus-visible {
+      outline: 2px solid #2F7BFF;
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+
+    /* ── Reduced motion ──────────────────────────────────────────── */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    /* ── Animations ──────────────────────────────────────────────── */
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.5; transform: scale(1.3); }
+    }
+    @keyframes row-flash {
+      0%   { background-color: rgba(47, 123, 255, 0.22); }
+      100% { background-color: transparent; }
+    }
+    @keyframes slide-in-top {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes ticker-slide {
+      from { opacity: 0; transform: translateX(12px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes fade-in {
+      from { opacity: 0; transform: translateY(12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes copied-pop {
+      0%   { transform: scale(0.9); }
+      60%  { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+
+    .live-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #27E1A0;
+      display: inline-block;
+      animation: pulse-dot 1.6s ease-in-out infinite;
+    }
+
+    .row-flash { animation: row-flash 0.9s ease-out forwards; }
+
+    .ticker-msg { animation: ticker-slide 0.4s ease-out; }
+
+    .fade-in { animation: fade-in 0.5s ease-out both; }
+
+    /* ── Progress bar ────────────────────────────────────────────── */
+    .progress-track {
+      height: 6px;
+      background: #222836;
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #2F7BFF, #27E1A0);
+      transition: width 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .progress-fill.unlocked {
+      background: linear-gradient(90deg, #27E1A0, #2F7BFF);
+    }
+
+    /* ── Rank badges ─────────────────────────────────────────────── */
+    .rank-badge {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Sora', sans-serif;
+      font-size: 12px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+    .rank-gold   { background: rgba(245,197,66,0.18); color: #F5C542; border: 1px solid rgba(245,197,66,0.35); }
+    .rank-silver { background: rgba(192,192,208,0.15); color: #C0C0D0; border: 1px solid rgba(192,192,208,0.3); }
+    .rank-bronze { background: rgba(205,127,50,0.18); color: #CD7F32; border: 1px solid rgba(205,127,50,0.3); }
+    .rank-normal { background: rgba(255,255,255,0.05); color: #94A3B8; border: 1px solid rgba(255,255,255,0.08); }
+
+    /* ── Status pills ────────────────────────────────────────────── */
+    .pill {
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      font-family: 'Manrope', sans-serif;
+      white-space: nowrap;
+    }
+    .pill-leading      { background: rgba(47,123,255,0.15); color: #2F7BFF; border: 1px solid rgba(47,123,255,0.3); }
+    .pill-catching     { background: rgba(39,225,160,0.12); color: #27E1A0; border: 1px solid rgba(39,225,160,0.25); }
+    .pill-behind       { background: rgba(148,163,184,0.1);  color: #64748B; border: 1px solid rgba(148,163,184,0.15); }
+    .pill-unlocked     { background: rgba(39,225,160,0.18); color: #27E1A0; border: 1px solid rgba(39,225,160,0.4); }
+
+    /* ── Leaderboard rows ────────────────────────────────────────── */
+    .lb-row {
+      background: #12151C;
+      border: 1px solid #222836;
+      border-radius: 10px;
+      padding: 12px 14px;
+      transition: background 0.3s;
+    }
+    .lb-row.top-1 { border-color: rgba(245,197,66,0.25); background: rgba(245,197,66,0.04); }
+    .lb-row.top-2 { border-color: rgba(192,192,208,0.2); background: rgba(192,192,208,0.03); }
+    .lb-row.top-3 { border-color: rgba(205,127,50,0.2);  background: rgba(205,127,50,0.03); }
+
+    /* ── Referral cards ──────────────────────────────────────────── */
+    .ref-card {
+      background: #12151C;
+      border: 1px solid #222836;
+      border-radius: 10px;
+      padding: 14px 16px;
+      cursor: pointer;
+      transition: border-color 0.2s, background 0.2s;
+      user-select: none;
+    }
+    .ref-card:hover { border-color: #2F7BFF; background: rgba(47,123,255,0.06); }
+    .ref-card.copied-state {
+      border-color: #27E1A0;
+      background: rgba(39,225,160,0.07);
+      animation: copied-pop 0.3s ease-out;
+    }
+
+    /* ── Stats cards ─────────────────────────────────────────────── */
+    .stat-card {
+      background: #12151C;
+      border: 1px solid #222836;
+      border-radius: 12px;
+      padding: 18px 20px;
+    }
+
+    /* ── Dialog modal ────────────────────────────────────────────── */
+    dialog {
+      background: #12151C;
+      border: 1px solid #222836;
+      border-radius: 16px;
+      padding: 0;
+      max-width: 480px;
+      width: calc(100vw - 32px);
+      color: #E2E8F0;
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      max-height: calc(100dvh - 40px);
+      overflow-y: auto;
+    }
+    dialog::backdrop {
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(4px);
+    }
+
+    /* ── Form inputs ─────────────────────────────────────────────── */
+    .form-input {
+      width: 100%;
+      background: #0A0C10;
+      border: 1px solid #222836;
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-family: 'Manrope', sans-serif;
+      font-size: 14px;
+      color: #E2E8F0;
+      transition: border-color 0.2s;
+    }
+    .form-input:focus { outline: none; border-color: #2F7BFF; }
+    .form-input.error { border-color: #FF4D6D; }
+    .form-input option { background: #12151C; }
+
+    /* ── Buttons ─────────────────────────────────────────────── */
+    .btn-primary {
+      background: linear-gradient(135deg, #2F7BFF, #1A5FD4);
+      color: #fff;
+      font-family: 'Sora', sans-serif;
+      font-weight: 600;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+    .btn-primary:hover  { opacity: 0.92; transform: translateY(-1px); }
+    .btn-primary:active { transform: translateY(0); opacity: 0.85; }
+
+    .btn-mint {
+      background: linear-gradient(135deg, #27E1A0, #1BB87E);
+      color: #0A0C10;
+      font-family: 'Sora', sans-serif;
+      font-weight: 700;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.15s;
+    }
+    .btn-mint:hover  { opacity: 0.92; transform: translateY(-1px); }
+    .btn-mint:active { transform: translateY(0); }
+
+    .btn-ghost {
+      background: transparent;
+      color: #94A3B8;
+      font-family: 'Manrope', sans-serif;
+      font-size: 13px;
+      border: 1px solid #222836;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: color 0.2s, border-color 0.2s;
+    }
+    .btn-ghost:hover { color: #E2E8F0; border-color: #4A5568; }
+
+    /* ── Spinner ─────────────────────────────────────────────── */
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: inline-block;
+    }
+
+    /* ── Ticker ──────────────────────────────────────────────── */
+    #ticker-bar {
+      background: rgba(47,123,255,0.08);
+      border: 1px solid rgba(47,123,255,0.15);
+      border-radius: 8px;
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 38px;
+    }
+
+    /* ── CTA section ─────────────────────────────────────────── */
+    #cta-section {
+      background: linear-gradient(135deg, rgba(47,123,255,0.08), rgba(39,225,160,0.05));
+      border: 1px solid rgba(47,123,255,0.18);
+      border-radius: 16px;
+    }
+
+    /* ── Success screen ──────────────────────────────────────── */
+    #success-screen { display: none; }
+    #success-screen.visible { display: block; animation: fade-in 0.45s ease-out both; }
+
+    /* ── Scrollbar ───────────────────────────────────────────── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: #0A0C10; }
+    ::-webkit-scrollbar-thumb { background: #222836; border-radius: 999px; }
+
+    /* ── Demo badge ──────────────────────────────────────────── */
+    .demo-badge {
+      font-size: 10px;
+      font-weight: 700;
+      font-family: 'Manrope', sans-serif;
+      background: rgba(245,197,66,0.15);
+      color: #F5C542;
+      border: 1px solid rgba(245,197,66,0.3);
+      border-radius: 999px;
+      padding: 2px 8px;
+      letter-spacing: 0.04em;
+    }
+
+    /* ── Error text ──────────────────────────────────────────── */
+    .field-error {
+      color: #FF4D6D;
+      font-size: 12px;
+      margin-top: 4px;
+      min-height: 18px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════
+     HEADER
+══════════════════════════════════════════════════════════════ -->
+<header class="sticky top-0 z-40 w-full" style="background: rgba(10,12,16,0.88); backdrop-filter: blur(14px); border-bottom: 1px solid #222836;">
+  <div class="max-w-4xl mx-auto px-4 py-4 flex items-start justify-between gap-4">
+    <div>
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="live-dot" aria-hidden="true"></span>
+        <span class="text-xs font-semibold text-mint" style="font-family: 'Manrope', sans-serif; letter-spacing: 0.03em;">Live now</span>
+        <span class="demo-badge">Demo data</span>
+      </div>
+      <h1 class="text-lg sm:text-xl font-bold mt-1" style="font-family: 'Sora', sans-serif; color: #F1F5F9; line-height: 1.3;">
+        Build your first AI project in 60 minutes
+      </h1>
+      <p class="text-sm mt-0.5" style="color: #2F7BFF; font-family: 'Sora', sans-serif; font-weight: 600;">
+        Live college scoreboard
+      </p>
+      <p class="text-xs mt-1" style="color: #64748B;">Powered by NxtWave Growth Challenge</p>
+    </div>
+    <button
+      id="register-btn-header"
+      class="btn-primary text-sm px-4 py-2 flex-shrink-0 mt-1"
+      aria-label="Register for the workshop"
+    >
+      Register now
+    </button>
+  </div>
+</header>
+
+<!-- ══════════════════════════════════════════════════════════════
+     MAIN CONTENT
+══════════════════════════════════════════════════════════════ -->
+<main class="max-w-4xl mx-auto px-4 pb-16 pt-6">
+
+  <!-- ── Stats Row ────────────────────────────────────────────── -->
+  <section aria-label="Summary statistics" class="grid grid-cols-3 gap-3 mb-6">
+    <div class="stat-card fade-in" style="animation-delay:0s">
+      <p class="text-xs mb-1" style="color:#64748B; font-family:'Manrope',sans-serif;">Total registrations</p>
+      <p id="stat-total" class="text-2xl sm:text-3xl font-bold" style="font-family:'Sora',sans-serif; color:#F1F5F9;">0</p>
+    </div>
+    <div class="stat-card fade-in" style="animation-delay:0.08s">
+      <p class="text-xs mb-1" style="color:#64748B; font-family:'Manrope',sans-serif;">Active colleges</p>
+      <p id="stat-colleges" class="text-2xl sm:text-3xl font-bold" style="font-family:'Sora',sans-serif; color:#F1F5F9;">0</p>
+    </div>
+    <div class="stat-card fade-in" style="animation-delay:0.16s">
+      <p class="text-xs mb-1" style="color:#64748B; font-family:'Manrope',sans-serif;">Colleges unlocked</p>
+      <p id="stat-unlocked" class="text-2xl sm:text-3xl font-bold" style="font-family:'Sora',sans-serif; color:#27E1A0;">0 / 10</p>
+    </div>
+  </section>
+
+  <!-- ── Ticker ─────────────────────────────────────────────────── -->
+  <div id="ticker-bar" class="mb-6 fade-in" style="animation-delay:0.22s" aria-live="polite" aria-atomic="true">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2F7BFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" flex-shrink="0">
+      <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+    </svg>
+    <span id="ticker-text" class="text-xs" style="color:#94A3B8; font-family:'Manrope',sans-serif;">Watching for updates…</span>
+  </div>
+
+  <!-- ── Leaderboard ────────────────────────────────────────────── -->
+  <section aria-label="College leaderboard" class="mb-8 fade-in" style="animation-delay:0.28s">
+    <div class="flex items-center justify-between mb-3">
+      <h2 class="text-base font-bold" style="font-family:'Sora',sans-serif; color:#F1F5F9;">College leaderboard</h2>
+      <span class="text-xs" style="color:#64748B;">Goal: 25 registrations to unlock reward</span>
+    </div>
+    <div id="leaderboard" class="flex flex-col gap-2" role="list" aria-label="Colleges ranked by registrations"></div>
+  </section>
+
+  <!-- ── Referral Codes ──────────────────────────────────────────── -->
+  <section aria-label="College referral codes" class="mb-8 fade-in" style="animation-delay:0.36s">
+    <h2 class="text-base font-bold mb-1" style="font-family:'Sora',sans-serif; color:#F1F5F9;">Use your college code while registering</h2>
+    <p class="text-xs mb-4" style="color:#64748B;">Tap a card to copy the code.</p>
+    <div id="referral-grid" class="grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));"></div>
+  </section>
+
+  <!-- ── CTA ────────────────────────────────────────────────────── -->
+  <section id="cta-section" class="p-6 sm:p-8 text-center fade-in" style="animation-delay:0.44s" aria-label="Call to action">
+    <h2 class="text-xl sm:text-2xl font-bold mb-2" style="font-family:'Sora',sans-serif; color:#F1F5F9;">Your batchmates are already in.</h2>
+    <p class="text-sm mb-6" style="color:#94A3B8;">Free, 60 minutes, no sales call.</p>
+    <button
+      id="register-btn-cta"
+      class="btn-primary text-base px-8 py-3 w-full sm:w-auto"
+      style="min-width:200px;"
+    >
+      Register now
+    </button>
+  </section>
+
+</main>
+
+<!-- ══════════════════════════════════════════════════════════════
+     REGISTRATION DIALOG
+══════════════════════════════════════════════════════════════ -->
+<dialog id="reg-dialog" aria-labelledby="dialog-title" aria-modal="true">
+
+  <!-- Registration form screen -->
+  <div id="form-screen">
+    <div class="flex items-center justify-between px-5 pt-5 pb-4" style="border-bottom:1px solid #222836;">
+      <h3 id="dialog-title" class="text-base font-bold" style="font-family:'Sora',sans-serif; color:#F1F5F9;">Register for the workshop</h3>
+      <button id="close-dialog-btn" class="btn-ghost px-3 py-1.5" aria-label="Close registration form">Close</button>
+    </div>
+
+    <form id="reg-form" novalidate class="px-5 pt-4 pb-5 flex flex-col gap-4">
+
+      <!-- Full name -->
+      <div>
+        <label for="inp-name" class="block text-sm font-medium mb-1.5" style="color:#C4CDD8;">Full name</label>
+        <input
+          id="inp-name"
+          type="text"
+          class="form-input"
+          placeholder="e.g. Priya Sharma"
+          autocomplete="name"
+          required
+        />
+        <p class="field-error" id="err-name" role="alert" aria-live="polite"></p>
+      </div>
+
+      <!-- WhatsApp number -->
+      <div>
+        <label for="inp-phone" class="block text-sm font-medium mb-1.5" style="color:#C4CDD8;">WhatsApp number</label>
+        <div class="flex gap-2">
+          <span class="form-input" style="width:56px;flex-shrink:0;text-align:center;color:#64748B;cursor:default;">+91</span>
+          <input
+            id="inp-phone"
+            type="tel"
+            class="form-input"
+            placeholder="9876543210"
+            maxlength="10"
+            autocomplete="tel-national"
+            required
+          />
+        </div>
+        <p class="field-error" id="err-phone" role="alert" aria-live="polite"></p>
+      </div>
+
+      <!-- College dropdown -->
+      <div>
+        <label for="inp-college" class="block text-sm font-medium mb-1.5" style="color:#C4CDD8;">College</label>
+        <select id="inp-college" class="form-input" required aria-describedby="err-college">
+          <option value="">Select your college</option>
+        </select>
+        <p class="field-error" id="err-college" role="alert" aria-live="polite"></p>
+      </div>
+
+      <!-- Other college input (hidden by default) -->
+      <div id="other-college-wrap" style="display:none;">
+        <label for="inp-other-college" class="block text-sm font-medium mb-1.5" style="color:#C4CDD8;">College name</label>
+        <input
+          id="inp-other-college"
+          type="text"
+          class="form-input"
+          placeholder="Enter your college name"
+        />
+        <p class="field-error" id="err-other-college" role="alert" aria-live="polite"></p>
+      </div>
+
+      <!-- Generic form error -->
+      <p class="field-error" id="err-general" role="alert" aria-live="assertive"></p>
+
+      <!-- Submit -->
+      <button type="submit" id="submit-btn" class="btn-primary py-3 text-sm font-semibold w-full">
+        Join the workshop
+      </button>
+
+    </form>
+  </div>
+
+  <!-- Success screen -->
+  <div id="success-screen" class="px-5 pt-5 pb-6 flex flex-col items-center text-center gap-4">
+    <div style="width:56px;height:56px;border-radius:50%;background:rgba(39,225,160,0.15);border:2px solid rgba(39,225,160,0.4);display:flex;align-items:center;justify-content:center;" aria-hidden="true">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#27E1A0" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="20 6 9 17 4 12"/>
+      </svg>
+    </div>
+    <h3 class="text-lg font-bold" style="font-family:'Sora',sans-serif; color:#F1F5F9;">You're in!</h3>
+    <p id="success-msg" class="text-sm" style="color:#94A3B8; line-height:1.6;"></p>
+    <button id="share-btn" class="btn-mint py-3 px-6 text-sm w-full">
+      Share with batchmates on WhatsApp
+    </button>
+    <button id="close-success-btn" class="btn-ghost px-4 py-2">Done</button>
+  </div>
+
+</dialog>
+
+<!-- ══════════════════════════════════════════════════════════════
+     SCRIPTS
+══════════════════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+/* ════════════════════════════════════════════════════════════════
+   CONFIG — set SHEET_WEBHOOK to your Google Apps Script URL
+   to enable live data posting. Leave empty for demo mode.
+════════════════════════════════════════════════════════════════ */
+const SHEET_WEBHOOK = ''; // e.g. 'https://script.google.com/macros/s/YOUR_ID/exec'
+
+const UNLOCK_THRESHOLD = 25;
+
+/* ════════════════════════════════════════════════════════════════
+   COLLEGE DATA  (10 fictional colleges, unique codes)
+════════════════════════════════════════════════════════════════ */
+const COLLEGES = [
+  { id: 'NWC01', name: 'Apex Institute of Technology',          code: 'NW-CSE26', count: 0 },
+  { id: 'NWC02', name: 'Horizon Engineering College',           code: 'NW-IT27',  count: 0 },
+  { id: 'NWC03', name: 'Pinnacle College of Engineering',       code: 'NW-ECE26', count: 0 },
+  { id: 'NWC04', name: 'Vertex Institute of Engineering',       code: 'NW-MECH27',count: 0 },
+  { id: 'NWC05', name: 'Solaris College of Technology',         code: 'NW-CIVIL26',count: 0 },
+  { id: 'NWC06', name: 'Meridian School of Engineering',        code: 'NW-AIDS27', count: 0 },
+  { id: 'NWC07', name: 'Zenith Technical University',           code: 'NW-CSM26',  count: 0 },
+  { id: 'NWC08', name: 'Nova Engineering and Technology',       code: 'NW-EEE27',  count: 0 },
+  { id: 'NWC09', name: 'Luminary College of Engineering',       code: 'NW-CSBS26', count: 0 },
+  { id: 'NWC10', name: 'Catalyst Institute of Technology',      code: 'NW-IOT27',  count: 0 },
+];
+
+/* ════════════════════════════════════════════════════════════════
+   STATE
+════════════════════════════════════════════════════════════════ */
+let colleges = JSON.parse(JSON.stringify(COLLEGES)); // deep copy
+let registeredPhones = new Set(JSON.parse(localStorage.getItem('nw_phones') || '[]'));
+
+// Load persisted counts (real registrations survive page refresh)
+const persisted = JSON.parse(localStorage.getItem('nw_counts') || '{}');
+colleges.forEach(c => { if (persisted[c.id] !== undefined) c.count = persisted[c.id]; });
+
+// Seed demo counts so leaderboard looks alive on first load
+(function seedDemo() {
+  const seeds = [18, 14, 11, 9, 7, 6, 4, 3, 1, 0];
+  colleges.forEach((c, i) => {
+    if (c.count === 0) c.count = seeds[i] || 0;
+  });
+})();
+
+/* ════════════════════════════════════════════════════════════════
+   UTILITIES
+════════════════════════════════════════════════════════════════ */
+function sorted() {
+  return [...colleges].sort((a, b) => b.count - a.count);
+}
+
+function saveCounts() {
+  const obj = {};
+  colleges.forEach(c => obj[c.id] = c.count);
+  localStorage.setItem('nw_counts', JSON.stringify(obj));
+}
+
+function savePhones() {
+  localStorage.setItem('nw_phones', JSON.stringify([...registeredPhones]));
+}
+
+function totalRegs()    { return colleges.reduce((s, c) => s + c.count, 0); }
+function activeColleges(){ return colleges.filter(c => c.count > 0).length; }
+function unlockedCount() { return colleges.filter(c => c.count >= UNLOCK_THRESHOLD).length; }
+
+/* ════════════════════════════════════════════════════════════════
+   RENDER — STATS
+════════════════════════════════════════════════════════════════ */
+function renderStats() {
+  document.getElementById('stat-total').textContent    = totalRegs();
+  document.getElementById('stat-colleges').textContent = activeColleges();
+  document.getElementById('stat-unlocked').textContent = `${unlockedCount()} / ${colleges.length}`;
+}
+
+/* ════════════════════════════════════════════════════════════════
+   RENDER — LEADERBOARD
+════════════════════════════════════════════════════════════════ */
+function pillHTML(rank, count) {
+  if (count >= UNLOCK_THRESHOLD) return `<span class="pill pill-unlocked">Reward unlocked</span>`;
+  if (rank <= 3)  return `<span class="pill pill-leading">Leading</span>`;
+  if (count >= 10) return `<span class="pill pill-catching">Catching up</span>`;
+  return `<span class="pill pill-behind">Falling behind</span>`;
+}
+
+function rankBadgeHTML(rank) {
+  if (rank === 1) return `<span class="rank-badge rank-gold"   aria-label="Rank 1">1</span>`;
+  if (rank === 2) return `<span class="rank-badge rank-silver" aria-label="Rank 2">2</span>`;
+  if (rank === 3) return `<span class="rank-badge rank-bronze" aria-label="Rank 3">3</span>`;
+  return `<span class="rank-badge rank-normal" aria-label="Rank ${rank}">${rank}</span>`;
+}
+
+function rowClass(rank) {
+  if (rank === 1) return 'lb-row top-1';
+  if (rank === 2) return 'lb-row top-2';
+  if (rank === 3) return 'lb-row top-3';
+  return 'lb-row';
+}
+
+function renderLeaderboard(flashId = null) {
+  const list = sorted();
+  const lb = document.getElementById('leaderboard');
+
+  list.forEach((college, idx) => {
+    const rank      = idx + 1;
+    const pct       = Math.min(100, Math.round((college.count / UNLOCK_THRESHOLD) * 100));
+    const remaining = Math.max(0, UNLOCK_THRESHOLD - college.count);
+    const unlocked  = college.count >= UNLOCK_THRESHOLD;
+    const rowId     = `lb-row-${college.id}`;
+
+    const progressFillClass = unlocked ? 'progress-fill unlocked' : 'progress-fill';
+    const statusText = unlocked
+      ? 'Reward unlocked'
+      : `${remaining} more to unlock`;
+
+    const html = `
+      <div class="${rowClass(rank)} ${flashId === college.id ? 'row-flash' : ''}"
+           id="${rowId}" role="listitem"
+           aria-label="${college.name}, rank ${rank}, ${college.count} registrations, ${statusText}">
+        <div class="flex items-center gap-3">
+          ${rankBadgeHTML(rank)}
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
+              <span class="text-sm font-semibold truncate" style="color:#F1F5F9; font-family:'Sora',sans-serif;">${college.name}</span>
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <span class="text-sm font-bold" style="color:${unlocked ? '#27E1A0' : '#2F7BFF'};">${college.count}</span>
+                ${pillHTML(rank, college.count)}
+              </div>
+            </div>
+            <div class="progress-track" role="progressbar" aria-valuenow="${college.count}" aria-valuemin="0" aria-valuemax="${UNLOCK_THRESHOLD}" aria-label="${statusText}">
+              <div class="${progressFillClass}" style="width:${pct}%"></div>
+            </div>
+            <p class="text-xs mt-1" style="color:${unlocked ? '#27E1A0' : '#64748B'};">
+              ${unlocked ? '✓ Reward unlocked' : `${remaining} more to unlock reward`}
+            </p>
+          </div>
+        </div>
+      </div>`;
+
+    const existing = document.getElementById(rowId);
+    if (existing) {
+      existing.outerHTML = html;
+    } else {
+      lb.insertAdjacentHTML('beforeend', html);
+    }
+  });
+
+  // Re-order DOM to match sorted order
+  const lb2 = document.getElementById('leaderboard');
+  list.forEach(c => {
+    const el = document.getElementById(`lb-row-${c.id}`);
+    if (el) lb2.appendChild(el);
+  });
+
+  // Flash row
+  if (flashId) {
+    const el = document.getElementById(`lb-row-${flashId}`);
+    if (el) {
+      el.classList.remove('row-flash');
+      void el.offsetWidth; // force reflow
+      el.classList.add('row-flash');
+    }
+  }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   RENDER — REFERRAL CODES
+════════════════════════════════════════════════════════════════ */
+function renderReferralGrid() {
+  const grid = document.getElementById('referral-grid');
+  grid.innerHTML = colleges.map(c => `
+    <button
+      class="ref-card text-left"
+      id="ref-${c.id}"
+      aria-label="Copy code ${c.code} for ${c.name}"
+      data-code="${c.code}"
+      data-college="${c.name}"
+    >
+      <p class="text-xs mb-1 truncate" style="color:#64748B; font-family:'Manrope',sans-serif;">${c.name}</p>
+      <p class="text-base font-bold" style="font-family:'Sora',sans-serif; color:#2F7BFF;">${c.code}</p>
+      <p class="text-xs mt-1" style="color:#64748B;" id="ref-label-${c.id}">Tap to copy</p>
+    </button>
+  `).join('');
+
+  grid.querySelectorAll('.ref-card').forEach(card => {
+    card.addEventListener('click', () => copyCode(card));
+    card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); copyCode(card); } });
+  });
+}
+
+async function copyCode(card) {
+  const code = card.dataset.code;
+  const label = card.querySelector('[id^="ref-label-"]');
+  try {
+    await navigator.clipboard.writeText(code);
+  } catch {
+    // Fallback for older environments
+    const ta = document.createElement('textarea');
+    ta.value = code; ta.style.position = 'fixed'; ta.style.opacity = '0';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy');
+    document.body.removeChild(ta);
+  }
+  card.classList.add('copied-state');
+  if (label) label.textContent = 'Copied!';
+  setTimeout(() => {
+    card.classList.remove('copied-state');
+    if (label) label.textContent = 'Tap to copy';
+  }, 2000);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   TICKER
+════════════════════════════════════════════════════════════════ */
+const FIRST_NAMES = ['Riya','Aarav','Priya','Karan','Sneha','Arjun','Meena','Rahul','Divya','Sai','Ananya','Vikram'];
+const LAST_NAMES  = ['S.','K.','R.','M.','P.','V.','T.','N.','A.','D.'];
+
+function randomName() {
+  return `${FIRST_NAMES[Math.floor(Math.random()*FIRST_NAMES.length)]} ${LAST_NAMES[Math.floor(Math.random()*LAST_NAMES.length)]}`;
+}
+
+function updateTicker(name, collegeName) {
+  const el = document.getElementById('ticker-text');
+  el.classList.remove('ticker-msg');
+  void el.offsetWidth;
+  el.textContent = `${name} from ${collegeName} just registered`;
+  el.classList.add('ticker-msg');
+}
+
+/* ════════════════════════════════════════════════════════════════
+   FULL RENDER
+════════════════════════════════════════════════════════════════ */
+function renderAll(flashId = null) {
+  renderStats();
+  renderLeaderboard(flashId);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   DEMO SIMULATION
+   ⚠️  DEMO-ONLY: remove the setInterval block when using real data
+════════════════════════════════════════════════════════════════ */
+(function startDemoSimulation() {
+  // Weights: colleges with fewer registrations are less likely to be picked,
+  // creating a realistic distribution
+  function weightedRandomCollege() {
+    const weights = colleges.map(c => Math.max(1, 20 - c.count));
+    const total   = weights.reduce((s, w) => s + w, 0);
+    let rand = Math.random() * total;
+    for (let i = 0; i < colleges.length; i++) {
+      rand -= weights[i];
+      if (rand <= 0) return colleges[i];
+    }
+    return colleges[0];
+  }
+
+  setInterval(() => {
+    const college = weightedRandomCollege();
+    college.count++;
+    const name = randomName();
+    updateTicker(name, college.name);
+    renderAll(college.id);
+  }, 3000);
+})();
+/* ⚠️  END DEMO-ONLY BLOCK */
+
+/* ════════════════════════════════════════════════════════════════
+   DIALOG — OPEN / CLOSE
+════════════════════════════════════════════════════════════════ */
+const dialog   = document.getElementById('reg-dialog');
+const formScreen    = document.getElementById('form-screen');
+const successScreen = document.getElementById('success-screen');
+
+function openDialog() {
+  formScreen.style.display    = 'block';
+  successScreen.classList.remove('visible');
+  clearForm();
+  dialog.showModal();
+  document.getElementById('inp-name').focus();
+}
+
+function closeDialog() {
+  dialog.close();
+}
+
+document.getElementById('register-btn-header').addEventListener('click', openDialog);
+document.getElementById('register-btn-cta').addEventListener('click', openDialog);
+document.getElementById('close-dialog-btn').addEventListener('click', closeDialog);
+document.getElementById('close-success-btn').addEventListener('click', closeDialog);
+
+// Close on backdrop click
+dialog.addEventListener('click', e => {
+  const rect = dialog.getBoundingClientRect();
+  const inDialog = rect.top <= e.clientY && e.clientY <= rect.bottom &&
+                   rect.left <= e.clientX && e.clientX <= rect.right;
+  if (!inDialog) closeDialog();
+});
+
+// Trap focus in dialog (basic)
+dialog.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeDialog();
+});
+
+/* ════════════════════════════════════════════════════════════════
+   DIALOG — POPULATE COLLEGE DROPDOWN
+════════════════════════════════════════════════════════════════ */
+function populateCollegeDropdown() {
+  const sel = document.getElementById('inp-college');
+  colleges.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.name;
+    sel.appendChild(opt);
+  });
+  const other = document.createElement('option');
+  other.value = 'OTHER';
+  other.textContent = 'My college is not listed';
+  sel.appendChild(other);
+}
+
+document.getElementById('inp-college').addEventListener('change', function () {
+  const wrap = document.getElementById('other-college-wrap');
+  wrap.style.display = this.value === 'OTHER' ? 'block' : 'none';
+  if (this.value === 'OTHER') {
+    document.getElementById('inp-other-college').focus();
+  }
+});
+
+/* ════════════════════════════════════════════════════════════════
+   FORM — VALIDATION & SUBMISSION
+════════════════════════════════════════════════════════════════ */
+function setError(id, msg) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = msg;
+}
+function clearErrors() {
+  ['err-name','err-phone','err-college','err-other-college','err-general'].forEach(id => setError(id, ''));
+  ['inp-name','inp-phone','inp-college','inp-other-college'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('error');
+  });
+}
+
+function clearForm() {
+  document.getElementById('reg-form').reset();
+  document.getElementById('other-college-wrap').style.display = 'none';
+  clearErrors();
+}
+
+document.getElementById('reg-form').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  clearErrors();
+
+  const name    = document.getElementById('inp-name').value.trim();
+  const phone   = document.getElementById('inp-phone').value.trim();
+  const colVal  = document.getElementById('inp-college').value;
+  const other   = document.getElementById('inp-other-college').value.trim();
+
+  let valid = true;
+
+  // Name
+  if (name.length < 2) {
+    setError('err-name', 'Please enter your full name (at least 2 characters).');
+    document.getElementById('inp-name').classList.add('error');
+    valid = false;
+  }
+
+  // Phone
+  if (!/^[6-9]\d{9}$/.test(phone)) {
+    setError('err-phone', 'Enter a valid 10-digit Indian mobile number (starts with 6–9).');
+    document.getElementById('inp-phone').classList.add('error');
+    valid = false;
+  } else if (registeredPhones.has(phone)) {
+    setError('err-phone', 'This number is already registered. Use a different number.');
+    document.getElementById('inp-phone').classList.add('error');
+    valid = false;
+  }
+
+  // College
+  if (!colVal) {
+    setError('err-college', 'Please select your college.');
+    document.getElementById('inp-college').classList.add('error');
+    valid = false;
+  } else if (colVal === 'OTHER' && other.length < 2) {
+    setError('err-other-college', 'Please enter your college name.');
+    document.getElementById('inp-other-college').classList.add('error');
+    valid = false;
+  }
+
+  if (!valid) return;
+
+  // Identify college object
+  let college = colleges.find(c => c.id === colVal) || null;
+  let collegeName = college ? college.name : other;
+  let collegeCode = college ? college.code : 'NW-OTHER';
+
+  // Submit button loading state
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner" aria-hidden="true"></span> Registering…`;
+
+  // Persist phone
+  registeredPhones.add(phone);
+  savePhones();
+
+  // Increment count
+  if (college) {
+    college.count++;
+    saveCounts();
+  }
+
+  // Post to webhook if configured
+  if (SHEET_WEBHOOK) {
+    try {
+      await fetch(SHEET_WEBHOOK, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain' },
+        mode: 'no-cors',
+        body: JSON.stringify({
+          time: new Date().toISOString(),
+          name,
+          phone,
+          college: collegeName,
+          code: collegeCode,
+        }),
+      });
+    } catch (_) { /* no-cors – ignore */ }
+  }
+
+  // Simulate network delay for UX
+  await new Promise(r => setTimeout(r, 700));
+
+  // Re-render with flash
+  renderAll(college ? college.id : null);
+  updateTicker(name.split(' ')[0], collegeName);
+
+  // Show success screen
+  const remaining = college ? Math.max(0, UNLOCK_THRESHOLD - college.count) : UNLOCK_THRESHOLD;
+  const msg = college
+    ? `${collegeName} is now at ${college.count} registration${college.count !== 1 ? 's' : ''}. ${
+        college.count >= UNLOCK_THRESHOLD
+          ? 'Your college has unlocked the reward!'
+          : `${remaining} more to unlock your reward.`
+      }`
+    : `Thank you for registering, ${name.split(' ')[0]}!`;
+
+  document.getElementById('success-msg').textContent = msg;
+
+  // WhatsApp share button
+  const shareMsg = college
+    ? `Hey! I just registered for the free workshop "Build Your First AI Project in 60 Minutes" by NxtWave. ${collegeName} is at ${college.count} registrations — only ${remaining} more to unlock our college reward! Join using code ${collegeCode}: https://nxtwave.io/ai-workshop`
+    : `Hey! I just registered for the free workshop "Build Your First AI Project in 60 Minutes" by NxtWave. Join now: https://nxtwave.io/ai-workshop`;
+
+  document.getElementById('share-btn').onclick = () => {
+    window.open(`https://wa.me/?text=${encodeURIComponent(shareMsg)}`, '_blank', 'noopener');
+  };
+
+  formScreen.style.display = 'none';
+  successScreen.classList.add('visible');
+
+  // Reset submit button
+  btn.disabled = false;
+  btn.innerHTML = 'Join the workshop';
+});
+
+/* ════════════════════════════════════════════════════════════════
+   INIT
+════════════════════════════════════════════════════════════════ */
+populateCollegeDropdown();
+renderReferralGrid();
+renderAll();
+</script>
+
+</body>
+</html>
